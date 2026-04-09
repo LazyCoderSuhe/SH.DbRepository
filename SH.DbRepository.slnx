@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="SH.DbRepository/SH.DbRepository.csproj" />
+  <Project Path="SH.DbRepositoryTests/SH.DbRepositoryTests.csproj" Id="0d3ae766-52f7-4c7b-9aa8-d4fa65bc421c" />
+</Solution>
