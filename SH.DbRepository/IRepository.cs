@@ -10,7 +10,7 @@ namespace SH.DbRepository
     /// <summary>
     /// EF 的数据库仓储接口，提供了基本的增删改查方法，具体实现由具体的仓储类来完成。
     /// </summary>
-    public interface IRepository<Key, T> where T : class, new()
+    public interface IRepository<Key, T> where T : class
     {
         #region Queryable 查询
 
