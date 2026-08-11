@@ -26,6 +26,34 @@ namespace SH.DbRepository
 
         public static async Task<IPage<T>> ToPageAsync<T>(this IQueryable<T> datas, Expression<Func<T, bool>>? predicate, Expression<Func<T, object>> orderByExpression, bool isDesc = false, int pageIndex = 1, int pageSize = 20)
         {
+            (pageIndex, pageSize, IQueryable<T> query, int count) = await ToPageOrderbyExp(datas, predicate, orderByExpression, isDesc, pageIndex, pageSize);
+            var data = await query.Skip((pageIndex - 1) * pageSize).Take(pageSize).ToListAsync();
+            return new PageModel<T>
+            {
+                Datas = data,
+                PageIndex = pageIndex,
+                PageSize = pageSize,
+                TotalCount = count,
+                TotalPages = (int)Math.Ceiling(count / (double)pageSize)
+            };
+        }
+
+        public static async Task<IPage<TT>> ToPageAsync<T,TT>(this IQueryable<T> datas, Expression<Func<T, bool>>? predicate, Expression<Func<T, object>> orderByExpression,Expression<Func<T,TT>> mapper, bool isDesc = false, int pageIndex = 1, int pageSize = 20)
+        {
+            (pageIndex, pageSize, IQueryable<T> query, int count) = await ToPageOrderbyExp(datas, predicate, orderByExpression, isDesc, pageIndex, pageSize);
+            var data = await query.Skip((pageIndex - 1) * pageSize).Take(pageSize).Select(mapper).ToListAsync();
+            return new PageModel<TT>
+            {
+                Datas = data,
+                PageIndex = pageIndex,
+                PageSize = pageSize,
+                TotalCount = count,
+                TotalPages = (int)Math.Ceiling(count / (double)pageSize)
+            };
+        }
+
+        private static async Task<(int pageIndex, int pageSize, IQueryable<T> query, int count)> ToPageOrderbyExp<T>(IQueryable<T> datas, Expression<Func<T, bool>>? predicate, Expression<Func<T, object>> orderByExpression, bool isDesc, int pageIndex, int pageSize)
+        {
             var query = predicate != null ? datas.Where(predicate) : datas;
             var count = await query.CountAsync();
             if (isDesc)
@@ -38,6 +66,13 @@ namespace SH.DbRepository
             }
             if (pageIndex <= 0) pageIndex = 1;
             if (pageSize <= 0) pageSize = 20;
+            return (pageIndex, pageSize, query, count);
+        }
+
+        public static async Task<IPage<T>> ToPageAsync<T>(this IQueryable<T> datas, Expression<Func<T, bool>>? predicate, Func<IQueryable<T>, IOrderedQueryable<T>> orderBy, int pageIndex = 1, int pageSize = 20)
+        {
+            (pageIndex, pageSize, IQueryable<T> query, int count) = await ToPageOrderByFunc(datas, predicate, orderBy, pageIndex, pageSize);
+
             var data = await query.Skip((pageIndex - 1) * pageSize).Take(pageSize).ToListAsync();
             return new PageModel<T>
             {
@@ -49,8 +84,24 @@ namespace SH.DbRepository
             };
         }
 
-      
-        public static async Task<IPage<T>> ToPageAsync<T>(this IQueryable<T> datas, Expression<Func<T, bool>>? predicate, Func<IQueryable<T>, IOrderedQueryable<T>> orderBy, int pageIndex = 1, int pageSize = 20)
+
+        public static async Task<IPage<TT>> ToPageAsync<T,TT>(this IQueryable<T> datas, Expression<Func<T, bool>>? predicate, Func<IQueryable<T>, IOrderedQueryable<T>> orderBy,Expression<Func<T,TT>> mapper, int pageIndex = 1, int pageSize = 20)
+        {
+            ArgumentNullException.ThrowIfNull(mapper);
+            (pageIndex, pageSize, IQueryable<T> query, int count) = await ToPageOrderByFunc(datas, predicate, orderBy, pageIndex, pageSize);
+
+            var data = await query.Skip((pageIndex - 1) * pageSize).Take(pageSize).Select(mapper).ToListAsync();
+            return new PageModel<TT>
+            {
+                Datas = data,
+                PageIndex = pageIndex,
+                PageSize = pageSize,
+                TotalCount = count,
+                TotalPages = (int)Math.Ceiling(count / (double)pageSize)
+            };
+        }
+
+        private static async Task<(int pageIndex, int pageSize, IQueryable<T> query, int count)> ToPageOrderByFunc<T>(IQueryable<T> datas, Expression<Func<T, bool>>? predicate, Func<IQueryable<T>, IOrderedQueryable<T>> orderBy, int pageIndex, int pageSize)
         {
             ArgumentNullException.ThrowIfNull(datas);
             ArgumentNullException.ThrowIfNull(orderBy);
@@ -61,16 +112,7 @@ namespace SH.DbRepository
 
             if (pageIndex <= 0) pageIndex = 1;
             if (pageSize <= 0) pageSize = 20;
-
-            var data = await query.Skip((pageIndex - 1) * pageSize).Take(pageSize).ToListAsync();
-            return new PageModel<T>
-            {
-                Datas = data,
-                PageIndex = pageIndex,
-                PageSize = pageSize,
-                TotalCount = count,
-                TotalPages = (int)Math.Ceiling(count / (double)pageSize)
-            };
+            return (pageIndex, pageSize, query, count);
         }
     }
 }

@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Query;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.Design;
@@ -8,7 +9,7 @@ using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
 
 namespace SH.DbRepository
 {
-    public abstract class BaseRepository<Key, T> : IRepository<Key, T> where T : class, new()
+    public abstract class BaseRepository<Key, T> : IRepository<Key, T> where T : class
     {
         #region 字段与构造函数
 
@@ -43,10 +44,18 @@ namespace SH.DbRepository
 
         public virtual async Task<IEnumerable<T>> GetAllAsync(CancellationToken cancellationToken = default)
         {
-            var query = Tracking ? Entities : Entities.AsNoTracking(); 
+            var query = Tracking ? Entities : Entities.AsNoTracking();
             return await query.ToListAsync(cancellationToken);
         }
 
+        public virtual async Task<IEnumerable<TT>> GetAllAsync<TT>(Expression<Func<T, TT>> mapper, CancellationToken cancellationToken = default)
+        {
+            var query = Tracking ? Entities : Entities.AsNoTracking();
+            return await query.Select(mapper).ToListAsync(cancellationToken);
+        }
+
+
+ 
         public virtual async Task<IEnumerable<T>> QueryAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(predicate);
@@ -55,12 +64,22 @@ namespace SH.DbRepository
                 .ToListAsync(cancellationToken);
 
         }
+        public virtual async Task<IEnumerable<TT>> QueryAsync<TT>(Expression<Func<T, bool>> predicate, Expression<Func<T, TT>> mapper, CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(predicate);
+            ArgumentNullException.ThrowIfNull(mapper);
+            var query = Tracking ? Entities : Entities.AsNoTracking();
+            return await query.Where(predicate)
+                .Select(mapper)
+                .ToListAsync(cancellationToken);
+        }
+
 
         public virtual async Task<IEnumerable<T>> QueryAsync(Expression<Func<T, bool>> predicate, int topCount, Expression<Func<T, object>> orderByExpression, bool descending = false, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(predicate);
             ArgumentNullException.ThrowIfNull(orderByExpression);
-            var query = Tracking ? Entities : Entities.AsNoTracking();  
+            var query = Tracking ? Entities : Entities.AsNoTracking();
             query = query.Where(predicate);
             if (descending)
             {
@@ -78,6 +97,30 @@ namespace SH.DbRepository
 
         }
 
+
+        public virtual async Task<IEnumerable<TT>> QueryAsync<TT>(Expression<Func<T, bool>> predicate, int topCount, Expression<Func<T, object>> orderByExpression, Func<T, TT> mapper, bool descending = false, CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(predicate);
+            ArgumentNullException.ThrowIfNull(orderByExpression);
+            ArgumentNullException.ThrowIfNull(mapper);
+            var query = Tracking ? Entities : Entities.AsNoTracking();
+            query = query.Where(predicate);
+            if (descending)
+            {
+                query = query.OrderByDescending(orderByExpression);
+            }
+            else
+            {
+                query = query.OrderBy(orderByExpression);
+            }
+
+            return await query
+                   .Take(topCount)
+                   .Select(mapper)
+                   .AsQueryable()
+                   .ToListAsync(cancellationToken);
+        }
+
         public virtual Task<IPage<T>> QueryAsync(Expression<Func<T, bool>> predicate, Expression<Func<T, object>> orderByExpression, int pageIndex, int pageSize, bool descending = false, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(predicate);
@@ -87,31 +130,65 @@ namespace SH.DbRepository
 
         }
 
+
+        public virtual  Task<IPage<TT>> QueryAsync<TT>(Expression<Func<T, bool>> predicate, Expression<Func<T, object>> orderByExpression, int pageIndex, int pageSize, Expression<Func<T, TT>> mapper, bool descending = false, CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(predicate);
+            ArgumentNullException.ThrowIfNull(orderByExpression);
+            ArgumentNullException.ThrowIfNull(mapper);
+            var query = Tracking ? Entities : Entities.AsNoTracking();
+            return query.ToPageAsync(predicate, orderByExpression, mapper, descending, pageIndex, pageSize);
+        }
+
+
+
+
         public virtual async Task<IEnumerable<T>> QueryAsync(Expression<Func<T, bool>> predicate, int topCount, Func<IQueryable<T>, IOrderedQueryable<T>> orderBy, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(predicate);
             ArgumentNullException.ThrowIfNull(orderBy);
             var query = Tracking ? Entities : Entities.AsNoTracking();
-             query = orderBy(query.Where(predicate));
+            query = orderBy(query.Where(predicate));
             return await query
                 .Take(topCount)
                 .ToListAsync(cancellationToken);
         }
+        public virtual async Task<IEnumerable<TT>> QueryAsync<TT>(Expression<Func<T, bool>> predicate, int topCount, Func<IQueryable<T>, IOrderedQueryable<T>> orderBy, Expression<Func<T, TT>> mapper, CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(predicate);
+            ArgumentNullException.ThrowIfNull(orderBy);
+            var query = Tracking ? Entities : Entities.AsNoTracking();
+            query = orderBy(query.Where(predicate));
+            return await query
+                .Take(topCount)
+                .Select(mapper)
+                .ToListAsync(cancellationToken);
+        }
+
 
         public virtual Task<IPage<T>> QueryAsync(Expression<Func<T, bool>> predicate, Func<IQueryable<T>, IOrderedQueryable<T>> orderBy, int pageIndex, int pageSize, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(predicate);
             ArgumentNullException.ThrowIfNull(orderBy);
-            var query = Tracking ? Entities : Entities.AsNoTracking();  
+            var query = Tracking ? Entities : Entities.AsNoTracking();
 
             return query.ToPageAsync(predicate, orderBy, pageIndex, pageSize);
         }
+        public virtual  Task<IPage<TT>> QueryAsync<TT>(Expression<Func<T, bool>> predicate, Func<IQueryable<T>, IOrderedQueryable<T>> orderBy, int pageIndex, int pageSize, Expression<Func<T, TT>> mapper, CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(predicate);
+            ArgumentNullException.ThrowIfNull(orderBy);
+            var query = Tracking ? Entities : Entities.AsNoTracking();
+
+            return query.ToPageAsync(predicate, orderBy, mapper, pageIndex, pageSize);
+        }
+
 
         #endregion
 
         #region 主键查询
 
-        public virtual async Task<T?> FindAsync(Key keyValues, CancellationToken cancellationToken = default)
+        public virtual async Task<T?> GetByIdAsync(Key keyValues, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(keyValues);
             return await _dbContext.Set<T>().FindAsync(keyValues, cancellationToken);
@@ -136,6 +213,21 @@ namespace SH.DbRepository
         #endregion
 
         #region 更新
+
+
+        public virtual int ExecuteUpdate(Expression<Func<T, bool>> predicate, Action<UpdateSettersBuilder<T>> setPropertyCalls)
+        {
+            ArgumentNullException.ThrowIfNull(predicate);
+            ArgumentNullException.ThrowIfNull(setPropertyCalls);
+            return _dbContext.Set<T>().Where(predicate).ExecuteUpdate(setPropertyCalls);
+        }
+
+        public virtual async Task<int> ExecuteUpdateAsync(Expression<Func<T, bool>> predicate, Action<UpdateSettersBuilder<T>> setPropertyCalls, CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(predicate);
+            ArgumentNullException.ThrowIfNull(setPropertyCalls);
+            return await _dbContext.Set<T>().Where(predicate).ExecuteUpdateAsync(setPropertyCalls, cancellationToken);
+        }
 
         public virtual Task UpdateAsync(T entity)
         {
@@ -163,6 +255,20 @@ namespace SH.DbRepository
         {
             _dbContext.Set<T>().RemoveRange(entities);
         }
+
+
+        public virtual int ExecuteDelete(Expression<Func<T, bool>> predicate)
+        {
+            ArgumentNullException.ThrowIfNull(predicate);
+            return _dbContext.Set<T>().Where(predicate).ExecuteDelete();
+        }
+        public virtual async Task<int> ExecuteDeleteAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(predicate);
+            return await _dbContext.Set<T>().Where(predicate).ExecuteDeleteAsync(cancellationToken);
+        }
+
+
         #endregion
     }
 
